@@ -5,29 +5,29 @@ import com.tuan.identity_service.dto.request.UserUpdateRequest;
 import com.tuan.identity_service.entity.User;
 import com.tuan.identity_service.exception.AppException;
 import com.tuan.identity_service.exception.ErrorCode;
+import com.tuan.identity_service.mapper.UserMapper;
 import com.tuan.identity_service.repository.UserRepository;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class UserService {
-    @Autowired
-    private UserRepository userRepository;
+    UserRepository userRepository;
+    UserMapper userMapper;
 
     public User createUser(UserCreationRequest request){
-        User user = new User();
 
-        if(userRepository.existsByUsername(request.getUsername())){
+        if(userRepository.existsByUsername(request.getUsername()))
             throw new AppException(ErrorCode.USER_EXISTED);
-        }
 
-        user.setUsername(request.getUsername());
-        user.setDob(request.getDob());
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setPassword(request.getPassword());
+        User user = userMapper.toUser(request);
 
         return userRepository.save(user);
     }
@@ -37,23 +37,23 @@ public class UserService {
     }
 
     public User getUserById(String id){
-        return userRepository.findById(id).orElseThrow(() -> new RuntimeException("User not found"));
+        return userRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
     }
 
     public User updateUserById(String id, UserUpdateRequest request){
-        User user = getUserById(id);
+        if (!userRepository.existsById(id)) {
+            throw new AppException(ErrorCode.USER_NOT_FOUND);
+        }
 
-        user.setDob(request.getDob());
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setPassword(request.getPassword());
+        User user = getUserById(id);
+        userMapper.updateUser(user, request);
 
         return userRepository.save(user);
     }
 
     public void deleteUserById(String id) {
         if (!userRepository.existsById(id)) {
-            throw new RuntimeException("User not found");
+            throw new AppException(ErrorCode.USER_NOT_FOUND);
         }
         userRepository.deleteById(id);
     }
