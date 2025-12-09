@@ -2,7 +2,9 @@ package com.tuan.identity_service.controller;
 
 import com.tuan.identity_service.dto.request.ApiResponse;
 import com.tuan.identity_service.dto.request.AuthenticationRequest;
+import com.tuan.identity_service.dto.request.IntrospectRequest;
 import com.tuan.identity_service.dto.request.response.AuthenticationResponse;
+import com.tuan.identity_service.dto.request.response.IntrospectResponse;
 import com.tuan.identity_service.service.AuthenticationService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -22,5 +24,10 @@ public class AuthenticationController {
     @PostMapping("/log-in")
     ApiResponse<AuthenticationResponse> authenticate(@RequestBody AuthenticationRequest request){
         return ApiResponse.<AuthenticationResponse>builder().result(authenticationService.authenticate(request)).build();
+    }
+
+    @PostMapping("/introspect")
+    ApiResponse<IntrospectResponse> introspect(@RequestBody IntrospectRequest request){
+        return ApiResponse.<IntrospectResponse>builder().result(authenticationService.introspect(request)).build();
     }
 }

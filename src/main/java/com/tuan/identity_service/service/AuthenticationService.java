@@ -2,21 +2,28 @@ package com.tuan.identity_service.service;
 
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
+import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import com.tuan.identity_service.dto.request.AuthenticationRequest;
+import com.tuan.identity_service.dto.request.IntrospectRequest;
 import com.tuan.identity_service.dto.request.response.AuthenticationResponse;
+import com.tuan.identity_service.dto.request.response.IntrospectResponse;
 import com.tuan.identity_service.exception.AppException;
 import com.tuan.identity_service.exception.ErrorCode;
 import com.tuan.identity_service.repository.UserRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.text.ParseException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
@@ -27,7 +34,10 @@ import java.util.Date;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AuthenticationService {
     UserRepository repository;
-    protected static final String KEY_SIGNER = "ec5829f00fc62941fb76eeef22d7bce570f1df1e45b4fa26f11539ff81d8d40b";
+
+    @NonFinal
+    @Value("${jwt.signer-key}")
+    protected String SIGNER_KEY;
     public AuthenticationResponse authenticate(AuthenticationRequest request){
         var user = repository.findByUsername(request.getUsername()).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         PasswordEncoder encoder = new BCryptPasswordEncoder(10);
@@ -47,7 +57,7 @@ public class AuthenticationService {
 
         JWSObject jwsObject = new JWSObject(jwsHeader, payload);
         try{
-            jwsObject.sign(new MACSigner(KEY_SIGNER.getBytes()));
+            jwsObject.sign(new MACSigner(SIGNER_KEY.getBytes()));
             return jwsObject.serialize();
 
         }
@@ -55,5 +65,23 @@ public class AuthenticationService {
             log.error("Cannot create token", e);
             throw new RuntimeException(e);
         }
+    }
+
+    public IntrospectResponse introspect(IntrospectRequest request){
+        var token = request.getToken();
+        try{
+            JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
+            SignedJWT signedJWT = SignedJWT.parse(token);
+            Date expDate = signedJWT.getJWTClaimsSet().getExpirationTime();
+            boolean verified = signedJWT.verify(verifier);
+            return IntrospectResponse.builder().valid(verified && expDate.after(new Date())).build() ;
+        }
+        catch(JOSEException e){
+            log.error("Cannot introspect token", e);
+            throw new RuntimeException();
+        } catch (ParseException e) {
+            throw new RuntimeException(e);
+        }
+
     }
 }
